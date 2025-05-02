@@ -1,6 +1,5 @@
-import torch
-import evaluate
 import numpy as np
+import evaluate
 import wandb
 from datasets import load_dataset
 from dataclasses import dataclass, field
@@ -120,11 +119,11 @@ def main():
 
     # sample limiting -----------------------------------------------------
     if data_args.max_train_samples > 0:
-        train_ds = train_set.select(range(data_args.max_train_samples))
+        train_set = train_set.select(range(data_args.max_train_samples))
     if data_args.max_eval_samples > 0:
-        eval_ds = val_set.select(range(data_args.max_eval_samples))
+        val_set = val_set.select(range(data_args.max_eval_samples))
     if data_args.max_predict_samples > 0:
-        test_ds = test_set.select(range(data_args.max_predict_samples))
+        test_set = test_set.select(range(data_args.max_predict_samples))
 
     ########################################################################
     # Model & Trainer                                                      #
@@ -166,3 +165,41 @@ def main():
         data_collator=data_collator,
         compute_metrics=compute_metrics,
     )
+
+    ########################################################################
+    # Training & Validation                                                #
+    ########################################################################
+
+    if training_args.do_train:
+        train_result = trainer.train()
+        # save final checkpoint
+        trainer.save_model(training_args.output_dir)
+        # save metrics for res.txt ---------------------------------------
+        metrics = trainer.evaluate()
+        val_acc = metrics["eval_accuracy"]
+        line = (f"epoch_num: {training_args.num_train_epochs}, "
+                f"lr: {training_args.learning_rate}, "
+                f"batch_size: {training_args.per_device_train_batch_size}, "
+                f"eval_acc: {val_acc:.4f}\n")
+        with open("res.txt", "a") as fp:
+            fp.write(line)
+        # train loss curve for train_loss.png -----------------------------
+        trainer.save_metrics("train", train_result.metrics)
+        trainer.save_state()  # W&B captures loss at every step
+
+    ########################################################################
+    # Prediction                                                           #
+    ########################################################################
+    if training_args.do_predict:
+        preds = trainer.predict(test_set, metric_key_prefix="predict")
+        test_raw = raw_datasets["test"]  # non-tokenised split
+        with open("predictions.txt", "w", encoding="utf-8") as fp:
+            for ex, label in zip(test_raw, np.argmax(preds.predictions, axis=1)):
+                line = f"{ex['sentence1']}###{ex['sentence2']}###{label}"
+                fp.write(line + "\n")
+
+    wandb.finish()
+
+
+if __name__ == '__main__':
+    main()
