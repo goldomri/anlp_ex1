@@ -43,21 +43,21 @@ class Hyperparameters:
 def parse_args():
     """
     Parse command line arguments.
-    :return: my_args, training_args
+    :return: my_args, hyperparameters, training_args
     """
-    parser = HfArgumentParser((DataTrainingArguments, TrainingArguments))
-    data_args, training_args = parser.parse_args_into_dataclasses()
+    parser = HfArgumentParser((DataTrainingArguments, Hyperparameters, TrainingArguments))
+    data_args, hyperparameters, training_args = parser.parse_args_into_dataclasses()
 
 
 def load_model_and_dataset():
     """
     Loads the model (with the relevant tokenizer) and dataset from HuggingFace.
-    :return: tokenizer, model, dataset
+    :return: tokenizer, model, raw_datasets
     """
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
-    ds = load_dataset(DATASET_NAME, TASK_NAME)
-    return tokenizer, model, ds
+    raw_datasets = load_dataset(DATASET_NAME, TASK_NAME)
+    return tokenizer, model, raw_datasets
 
 
 def split_dataset(ds):
@@ -73,8 +73,11 @@ def split_dataset(ds):
 
 
 def main():
-    tokenizer, model, ds = load_model_and_dataset()
+    tokenizer, model, raw_datasets = load_model_and_dataset()
 
     def preprocess_function(examples):
         result = tokenizer(examples["sentence1"], examples["sentence2"], truncation=True)
         return result
+
+    tokenized_datasets = raw_datasets.map(preprocess_function, batched=True)
+    train_set, val_set, test_set = split_dataset(tokenized_datasets)
