@@ -156,7 +156,6 @@ def main():
             per_device_train_batch_size=hp_args.batch_size,
             per_device_eval_batch_size=hp_args.batch_size,
             learning_rate=hp_args.lr,
-            num_train_epochs=hp_args.num_train_epochs,
             eval_strategy="epoch",
             save_strategy="no",
             logging_steps=10,
