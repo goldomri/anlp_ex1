@@ -60,7 +60,8 @@ def parse_args():
     :return: my_args, hyperparameters, training_args
     """
     parser = HfArgumentParser((DataTrainingArguments, HyperparameterArguments, TrainingArguments))
-    data_args, hp_args, training_args = parser.parse_args_into_dataclasses()
+    data_args, hp_args, training_args, remaining_args = parser.parse_args_into_dataclasses(
+        return_remaining_strings=True)
     return data_args, hp_args, training_args
 
 
@@ -141,24 +142,25 @@ def main():
     # Weights & Biases ----------------------------------------------------
     training_args.report_to = ["wandb"]
     wandb.login()
+    run_name = f"lr{hp_args.lr}_bs{hp_args.batch_size}_ep{training_args.num_train_epochs}"
+    output_dir = "./checkpoints/" + run_name
     wandb.init(
         project="anlp_ex1",
-        name=f"lr{hp_args.lr}_bs{hp_args.batch_size}_ep{hp_args.num_train_epochs}",
+        name=run_name,
         config={**vars(hp_args), **vars(data_args)},
     )
 
+    training_args.output_dir = output_dir
+    training_args.per_device_train_batch_size = hp_args.batch_size
+    training_args.per_device_eval_batch_size = hp_args.batch_size
+    training_args.learning_rate = hp_args.lr
+    training_args.eval_strategy = "epoch"
+    training_args.save_strategy = "no"
+    training_args.logging_steps = 10
+
     trainer = Trainer(
         model=model,
-        args=TrainingArguments(
-            **training_args.__dict__,
-            output_dir=training_args.output_dir or "./checkpoints",
-            per_device_train_batch_size=hp_args.batch_size,
-            per_device_eval_batch_size=hp_args.batch_size,
-            learning_rate=hp_args.lr,
-            eval_strategy="epoch",
-            save_strategy="no",
-            logging_steps=10,
-        ),
+        args=training_args,
         train_dataset=train_set if training_args.do_train else None,
         eval_dataset=val_set,
         tokenizer=tokenizer,
