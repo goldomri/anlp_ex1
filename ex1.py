@@ -1,6 +1,7 @@
 import torch
 import evaluate
 import numpy as np
+import wandb
 from datasets import load_dataset
 from dataclasses import dataclass, field
 from transformers import (
@@ -68,15 +69,14 @@ def parse_args():
 # Load Dataset and Model helpers                                               #
 ################################################################################
 
-def load_model_and_dataset():
+def load_tokenizer_and_dataset():
     """
     Loads the model (with the relevant tokenizer) and dataset from HuggingFace.
-    :return: tokenizer, model, raw_datasets
+    :return: tokenizer, raw_datasets
     """
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
     raw_datasets = load_dataset(DATASET_NAME, TASK_NAME)
-    return tokenizer, model, raw_datasets
+    return tokenizer, raw_datasets
 
 
 def split_dataset(ds):
@@ -95,12 +95,12 @@ def split_dataset(ds):
 # Metric helper                                                                #
 ################################################################################
 
-accuracy = evaluate.load("accuracy")
+metric = evaluate.load("accuracy")
 
 
 def compute_metrics(p: EvalPrediction):
     preds = np.argmax(p.predictions, axis=1)
-    return accuracy.compute(predictions=preds, references=p.label_ids)
+    return metric.compute(predictions=preds, references=p.label_ids)
 
 
 ################################################################################
@@ -109,7 +109,7 @@ def compute_metrics(p: EvalPrediction):
 
 def main():
     data_args, hp_args, training_args = parse_args()
-    tokenizer, model, raw_datasets = load_model_and_dataset()
+    tokenizer, raw_datasets = load_tokenizer_and_dataset()
 
     def preprocess_function(examples):
         result = tokenizer(examples["sentence1"], examples["sentence2"], truncation=True)
@@ -117,3 +117,53 @@ def main():
 
     tokenized_datasets = raw_datasets.map(preprocess_function, batched=True)
     train_set, val_set, test_set = split_dataset(tokenized_datasets)
+
+    # sample limiting -----------------------------------------------------
+    if data_args.max_train_samples > 0:
+        train_ds = train_set.select(range(data_args.max_train_samples))
+    if data_args.max_eval_samples > 0:
+        eval_ds = val_set.select(range(data_args.max_eval_samples))
+    if data_args.max_predict_samples > 0:
+        test_ds = test_set.select(range(data_args.max_predict_samples))
+
+    ########################################################################
+    # Model & Trainer                                                      #
+    ########################################################################
+    if training_args.do_train:
+        model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+    else:
+        # in prediction-only mode we expect --model_path
+        if not data_args.model_path:
+            raise ValueError("--model_path must be supplied when --do_predict without --do_train.")
+        model = AutoModelForSequenceClassification.from_pretrained(data_args.model_path)
+
+    data_collator = DataCollatorWithPadding(tokenizer)
+
+    # Weights & Biases ----------------------------------------------------
+    training_args.report_to = ["wandb"]
+    wandb.login()
+    wandb.init(
+        project="anlp_ex1",
+        name=f"lr{hp_args.lr}_bs{hp_args.batch_size}_ep{hp_args.num_train_epochs}",
+        config={**vars(hp_args), **vars(data_args)},
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=TrainingArguments(
+            **training_args.__dict__,
+            output_dir=training_args.output_dir or "./checkpoints",
+            per_device_train_batch_size=hp_args.batch_size,
+            per_device_eval_batch_size=hp_args.batch_size,
+            learning_rate=hp_args.lr,
+            num_train_epochs=hp_args.num_train_epochs,
+            eval_strategy="epoch",
+            save_strategy="no",
+            logging_steps=10,
+        ),
+        train_dataset=train_set if training_args.do_train else None,
+        eval_dataset=val_set,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics,
+    )
