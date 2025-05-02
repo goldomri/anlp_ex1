@@ -22,21 +22,21 @@ class DataTrainingArguments:
         default=-1,
         metadata={"help": "Limit predict samples (–1 = all)"}
     )
+    model_path: str = field(
+        default=None,
+        metadata={"help": "Path to model for prediction"}
+    )
 
 
 @dataclass
-class RunArguments:
-    do_train: bool = field(
-        default=False,
-        metadata={"help": "Whether to run training"}
+class Hyperparameters:
+    lr: float = field(
+        default=1e-5,
+        metadata={"help": "Learning rate"}
     )
-    do_predict: bool = field(
-        default=False,
-        metadata={"help": "Whether to run prediction"}
-    )
-    model_path: str = field(
-        default=None,
-        metadata={"help": "Path to fine-tuned model for prediction"}
+    batch_size: int = field(
+        default=30,
+        metadata={"help": "Train batch size"}
     )
 
 
@@ -45,8 +45,8 @@ def parse_args():
     Parse command line arguments.
     :return: my_args, training_args
     """
-    parser = HfArgumentParser((DataTrainingArguments, RunArguments, TrainingArguments))
-    data_args, run_args, training_args = parser.parse_args_into_dataclasses()
+    parser = HfArgumentParser((DataTrainingArguments, TrainingArguments))
+    data_args, training_args = parser.parse_args_into_dataclasses()
 
 
 def load_model_and_dataset():
@@ -76,6 +76,5 @@ def main():
     tokenizer, model, ds = load_model_and_dataset()
 
     def preprocess_function(examples):
-        # Tokenize the texts
-        result = tokenizer(examples[‘input’], max_length = 512, truncation = True)
+        result = tokenizer(examples["sentence1"], examples["sentence2"], truncation=True)
         return result
