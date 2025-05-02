@@ -16,6 +16,9 @@ from transformers import (
 MODEL_NAME = "bert-base-uncased"
 DATASET_NAME = "nyu-mll/glue"
 TASK_NAME = "mrpc"
+PROJECT_DIR = "/content/gdrive/MyDrive/Colab Notebooks/anlp_ex1"
+RES_FILE = PROJECT_DIR + "/res.txt"
+
 
 
 ################################################################################
@@ -143,7 +146,7 @@ def main():
     training_args.report_to = ["wandb"]
     wandb.login()
     run_name = f"lr{hp_args.lr}_bs{hp_args.batch_size}_ep{training_args.num_train_epochs}"
-    output_dir = "./checkpoints/" + run_name
+    output_dir = PROJECT_DIR + run_name
     wandb.init(
         project="anlp_ex1",
         name=run_name,
@@ -183,7 +186,7 @@ def main():
                 f"lr: {training_args.learning_rate}, "
                 f"batch_size: {training_args.per_device_train_batch_size}, "
                 f"eval_acc: {val_acc:.4f}\n")
-        with open("res.txt", "a") as fp:
+        with open(RES_FILE, "a") as fp:
             fp.write(line)
         # train loss curve for train_loss.png -----------------------------
         trainer.save_metrics("train", train_result.metrics)
