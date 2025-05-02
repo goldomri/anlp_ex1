@@ -1,0 +1,5 @@
+numpy==2.2.5
+evaluate==0.4.3
+wandb==0.19.10
+datasets==3.5.1
+transformers==4.51.3
