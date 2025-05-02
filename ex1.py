@@ -1,12 +1,26 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, HfArgumentParser, TrainingArguments
+import evaluate
+import numpy as np
 from datasets import load_dataset
 from dataclasses import dataclass, field
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    DataCollatorWithPadding,
+    HfArgumentParser,
+    TrainingArguments,
+    Trainer,
+    EvalPrediction
+)
 
 MODEL_NAME = "bert-base-uncased"
 DATASET_NAME = "nyu-mll/glue"
 TASK_NAME = "mrpc"
 
+
+################################################################################
+# Command-line / dataclass interfaces                                          #
+################################################################################
 
 @dataclass
 class DataTrainingArguments:
@@ -29,7 +43,7 @@ class DataTrainingArguments:
 
 
 @dataclass
-class Hyperparameters:
+class HyperparameterArguments:
     lr: float = field(
         default=1e-5,
         metadata={"help": "Learning rate"}
@@ -45,9 +59,14 @@ def parse_args():
     Parse command line arguments.
     :return: my_args, hyperparameters, training_args
     """
-    parser = HfArgumentParser((DataTrainingArguments, Hyperparameters, TrainingArguments))
-    data_args, hyperparameters, training_args = parser.parse_args_into_dataclasses()
+    parser = HfArgumentParser((DataTrainingArguments, HyperparameterArguments, TrainingArguments))
+    data_args, hp_args, training_args = parser.parse_args_into_dataclasses()
+    return data_args, hp_args, training_args
 
+
+################################################################################
+# Load Dataset and Model helpers                                               #
+################################################################################
 
 def load_model_and_dataset():
     """
@@ -72,7 +91,24 @@ def split_dataset(ds):
     return train_set, val_set, test_set
 
 
+################################################################################
+# Metric helper                                                                #
+################################################################################
+
+accuracy = evaluate.load("accuracy")
+
+
+def compute_metrics(p: EvalPrediction):
+    preds = np.argmax(p.predictions, axis=1)
+    return accuracy.compute(predictions=preds, references=p.label_ids)
+
+
+################################################################################
+# Main routine                                                                 #
+################################################################################
+
 def main():
+    data_args, hp_args, training_args = parse_args()
     tokenizer, model, raw_datasets = load_model_and_dataset()
 
     def preprocess_function(examples):
