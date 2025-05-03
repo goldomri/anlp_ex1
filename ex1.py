@@ -195,9 +195,10 @@ def main():
     # Prediction                                                           #
     ########################################################################
     if training_args.do_predict:
+        model.eval()
         preds = trainer.predict(test_set, metric_key_prefix="predict")
         test_raw = raw_datasets["test"]  # non-tokenised split
-        with open("predictions.txt", "w", encoding="utf-8") as fp:
+        with open(training_args.output_dir + "predictions.txt", "w", encoding="utf-8") as fp:
             for ex, label in zip(test_raw, np.argmax(preds.predictions, axis=1)):
                 line = f"{ex['sentence1']}###{ex['sentence2']}###{label}"
                 fp.write(line + "\n")
