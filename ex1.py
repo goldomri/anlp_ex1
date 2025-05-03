@@ -16,8 +16,8 @@ from transformers import (
 MODEL_NAME = "bert-base-uncased"
 DATASET_NAME = "nyu-mll/glue"
 TASK_NAME = "mrpc"
-PROJECT_DIR = "/content/gdrive/MyDrive/Colab Notebooks/anlp_ex1"
-RES_FILE = PROJECT_DIR + "/res.txt"
+PROJECT_DIR = "/content/gdrive/MyDrive/Colab Notebooks/anlp_ex1/"
+RES_FILE = PROJECT_DIR + "res.txt"
 
 
 ################################################################################
