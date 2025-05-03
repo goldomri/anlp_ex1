@@ -20,7 +20,6 @@ PROJECT_DIR = "/content/gdrive/MyDrive/Colab Notebooks/anlp_ex1"
 RES_FILE = PROJECT_DIR + "/res.txt"
 
 
-
 ################################################################################
 # Command-line / dataclass interfaces                                          #
 ################################################################################
