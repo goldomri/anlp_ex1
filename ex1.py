@@ -158,7 +158,7 @@ def main():
     training_args.learning_rate = hp_args.lr
     training_args.eval_strategy = "epoch"
     training_args.save_strategy = "no"
-    training_args.logging_steps = 10
+    training_args.logging_steps = 1
 
     trainer = Trainer(
         model=model,
